@@ -1,6 +1,6 @@
 
 
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html>
   <head>
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -50,7 +50,7 @@
         if(input.value){
 
             socket.emit("chat message", `${username}: ${input.value}`)
-            // socket.emit("chat message", input.value) // 🔴 send to server
+            // socket.emit("chat message", input.value) //  send to server
             input.value = ""
         }
     })
@@ -82,4 +82,286 @@
     </script>
 
   </body>
-</html> 
+</html>  -->
+
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat App</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #fdfbfb, #ebedee);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    #messages {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      list-style-type: none;
+      margin: 0;
+    }
+
+    #messages > li {
+      max-width: 70%;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.5rem;
+      border-radius: 1rem;
+      position: relative;
+      word-wrap: break-word;
+    }
+
+    #messages > li.self {
+      background: #007bff;
+      color: white;
+      align-self: flex-end;
+      margin-left: auto;
+    }
+
+    #messages > li.other {
+      background: #e4e6eb;
+      color: #000;
+      align-self: flex-start;
+      margin-right: auto;
+    }
+
+    #form {
+      display: flex;
+      padding: 0.75rem;
+      background: white;
+      border-top: 1px solid #ccc;
+      position: sticky;
+      bottom: 0;
+      box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    #input {
+      flex-grow: 1;
+      border: 1px solid #ccc;
+      border-radius: 1.5rem;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      outline: none;
+      margin-right: 0.5rem;
+    }
+
+    button {
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 1.5rem;
+      background-color: #007bff;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #toggle-btn {
+      margin-left: 0.5rem;
+      background-color: #6c757d;
+    }
+
+    #toggle-btn:hover {
+      background-color: #5a6268;
+    }
+  </style>
+</head>
+<body>
+  <ul id="messages"></ul>
+  <form id="form" action="">
+    <input id="input" autocomplete="off" placeholder="Type your message..." />
+    <button type="submit">Send</button>
+    <button type="button" id="toggle-btn">Disconnect</button>
+  </form>
+
+  <script src="/socket.io/socket.io.js"></script>
+
+ 
+<!-- // using raw data -->
+<!-- <script>
+  const socket = io();
+  const form = document.getElementById('form');
+  const input = document.getElementById('input');
+  const messages = document.getElementById('messages');
+  const toggleBtn = document.getElementById('toggle-btn');
+
+  let connected = true;
+  let username = '';
+
+  // Prompt for username
+  while (!username) {
+    username = prompt("Enter your name:");
+    if (!username) alert("Name is required to chat!");
+  }
+
+  // Submit message
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (input.value) {
+      const msg = {
+        username,
+        text: input.value
+      };
+      socket.emit('chatMessage', msg);
+      appendMessage(msg, 'self');
+      input.value = '';
+    }
+  });
+
+  // Receive message
+  socket.on('chatMessage', (msg) => {
+    appendMessage(msg, 'other');
+  });
+
+  // Toggle connect/disconnect
+  toggleBtn.addEventListener('click', () => {
+    if (connected) {
+      socket.disconnect();
+      toggleBtn.textContent = 'Connect';
+    } else {
+      socket.connect();
+      toggleBtn.textContent = 'Disconnect';
+    }
+    connected = !connected;
+  });
+
+  // Append chat message to DOM
+  function appendMessage(msg, type) {
+    const item = document.createElement('li');
+    item.classList.add(type);
+    item.innerHTML = `<strong>${msg.username}:</strong> ${msg.text}`;
+    messages.appendChild(item);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+
+</script> -->
+
+
+<!-- using mysql db -->
+ <script>
+   let counter = 0;
+  const socket = io({
+    auth: {
+      serverOffset: 0
+    },
+    ackTimeout: 10000,
+    retries: 3
+  });
+
+  const form = document.getElementById('form');
+  const input = document.getElementById('input');
+  const messages = document.getElementById('messages');
+  const toggleBtn = document.getElementById('toggle-btn');
+
+  let connected = true;
+  let username = '';
+
+  // Prompt for username
+  while (!username) {
+    username = prompt("Enter your name:");
+    if (!username) alert("Name is required to chat!");
+  }
+
+
+   //  Fetch previous messages from the API
+  async function loadMessages() {
+    try {
+      const res = await fetch('/api/messages');
+      const data = await res.json();
+      messages.innerHTML = ''; // Clear old messages in DOM
+      data.forEach((msg) => {
+        appendMessage({ username: 'Recovered', text: msg.content }, 'other');
+        socket.auth.serverOffset = msg.id; // Set latest known ID
+      });
+    } catch (err) {
+      console.error('Failed to load messages:', err);
+       alert('⚠️ Could not fetch messages. See console.');
+    }
+  }
+
+  async function loadMessages() {
+  console.log("Fetching messages..."); // 
+  }
+
+
+  // Submit message
+  // form.addEventListener('submit', (e) => {
+  //   e.preventDefault();
+  //   if (input.value) {
+  //     const msg = {
+  //       username,
+  //       text: input.value
+  //     };
+  //     socket.emit('chatMessage', msg);
+  //     appendMessage(msg, 'self');
+  //     input.value = '';
+  //   }
+  // });
+
+
+form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (input.value) {
+      const msg = {
+        username,
+        text: input.value
+      };
+      const clientOffset = `${socket.id}-${counter++}`;
+      socket.emit('chatMessage', msg, clientOffset, () => {
+        console.log("Message acked");
+      });
+      appendMessage(msg, 'self');
+      input.value = '';
+    }
+  });
+
+
+
+  // Receive message from others (broadcasted)
+  socket.on('chatMessage', (msg, serverOffset) => {
+    // Avoid showing your own message twice
+    if (msg.username !== username) {
+      appendMessage(msg, 'other');
+    }
+    socket.auth.serverOffset = serverOffset; // track message ID
+  });
+
+  // Connect/disconnect toggle
+  toggleBtn.addEventListener('click', () => {
+    if (connected) {
+      socket.disconnect();
+      toggleBtn.textContent = 'Connect';
+    } else {
+      socket.connect();
+      toggleBtn.textContent = 'Disconnect';
+    }
+    connected = !connected;
+  });
+
+  // DOM rendering
+  function appendMessage(msg, type) {
+    const item = document.createElement('li');
+    item.classList.add(type);
+    item.innerHTML = `<strong>${msg.username}:</strong> ${msg.text}`;
+    messages.appendChild(item);
+    messages.scrollTop = messages.scrollHeight;
+  }
+</script>
+
+
+
+</body>
+</html>
