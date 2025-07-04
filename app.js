@@ -23,7 +23,7 @@ const __dirname = path.dirname(__filename);
 const app = express()
 
 // parse the josn bodies
-app.use(express.json())
+app.use(express.json())    
 
 // Serve static files from the "public" folder
 app.use(express.static(path.join(__dirname, 'public')));
@@ -79,6 +79,11 @@ start()
 
 
 
+
+
+
+
+// node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 
 
 // nodemon app.js

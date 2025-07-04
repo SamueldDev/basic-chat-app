@@ -1,0 +1,162 @@
+
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat App</title>
+  <style>
+    body { font-family: sans-serif; }
+    #messages { list-style-type: none; padding: 0; max-height: 400px; overflow-y: scroll; }
+    #messages li.self { text-align: right; background: #e0ffe0; margin: 4px 0; padding: 4px; }
+    #messages li.other { text-align: left; background: #f0f0f0; margin: 4px 0; padding: 4px; }
+  </style>
+</head>
+<body>
+
+<h2>Chat Room</h2>
+<ul id="messages"></ul>
+
+<form id="form">
+  <input id="input" autocomplete="off" placeholder="Type your message..." />
+  <button>Send</button>
+</form>
+
+<button id="toggle-btn">Disconnect</button>
+<button onclick="logout()">Logout</button>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  // ✅ Check for authentication
+  const token = localStorage.getItem('token');
+  const username = localStorage.getItem('username');
+
+  if (!token || !username) {
+    alert('You must be logged in!');
+    location.href = 'login.html';
+  }
+
+  let counter = 0;
+  const displayedMessages = new Set();
+
+  const socket = io({
+    auth: {
+      token,
+      serverOffset: 0
+    },
+    ackTimeout: 10000,
+    retries: 3
+  });
+
+  const form = document.getElementById('form');
+  const input = document.getElementById('input');
+  const messages = document.getElementById('messages');
+  const toggleBtn = document.getElementById('toggle-btn');
+
+  let connected = true;
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (input.value.trim()) {
+      const text = input.value.trim();
+      const clientOffset = `${socket.id}-${counter++}`;
+      const msg = { username, text, clientOffset };
+
+      // Optimistic UI
+      appendMessage(msg, 'self', clientOffset);
+      displayedMessages.add(clientOffset);
+
+      socket.emit('chatMessage', msg, clientOffset, (err, serverId) => {
+        if (err) {
+          console.error("Message failed:", err);
+        } else {
+          upgradeMessageId(clientOffset, serverId);
+        }
+      });
+
+      input.value = '';
+    }
+  });
+
+  socket.on('chatMessage', (msg, serverId) => {
+    // If already shown via optimistic UI, upgrade
+    if (msg.clientOffset && displayedMessages.has(msg.clientOffset)) {
+      upgradeMessageId(msg.clientOffset, serverId);
+      return;
+    }
+
+    // Otherwise show as new message
+    const type = msg.username === username ? 'self' : 'other';
+    appendMessage(msg, type, serverId);
+  });
+
+  socket.on('messageDeleted', (messageId) => {
+    const li = document.querySelector(`#messages li[data-id="${messageId}"]`);
+    if (li) li.remove();
+  });
+
+  toggleBtn.addEventListener('click', () => {
+    if (connected) {
+      socket.disconnect();
+      toggleBtn.textContent = 'Connect';
+    } else {
+      socket.connect();
+      toggleBtn.textContent = 'Disconnect';
+    }
+    connected = !connected;
+  });
+
+  function appendMessage(msg, type, messageId) {
+    const item = document.createElement('li');
+    item.classList.add(type);
+    if (messageId) item.dataset.id = messageId;
+
+    const strong = document.createElement('strong');
+    strong.textContent = `${msg.username}: `;
+
+    const span = document.createElement('span');
+    span.textContent = msg.text;
+
+    item.appendChild(strong);
+    item.appendChild(span);
+
+    if (type === 'self' && messageId) {
+      const btn = document.createElement('button');
+      btn.textContent = '🗑️';
+      btn.style.marginLeft = '10px';
+      btn.addEventListener('click', () => {
+        socket.emit('deleteMessage', messageId);
+      });
+      item.appendChild(btn);
+    }
+
+    messages.appendChild(item);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function upgradeMessageId(tempId, realId) {
+    const li = document.querySelector(`#messages li[data-id="${tempId}"]`);
+    if (!li) return;
+
+    li.dataset.id = realId;
+
+    // Add delete button if not present
+    if (!li.querySelector('button')) {
+      const btn = document.createElement('button');
+      btn.textContent = '🗑️';
+      btn.style.marginLeft = '10px';
+      btn.addEventListener('click', () => {
+        socket.emit('deleteMessage', realId);
+      });
+      li.appendChild(btn);
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    location.href = 'login.html';
+  }
+</script>
+
+</body>
+</html>

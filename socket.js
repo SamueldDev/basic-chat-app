@@ -1,17 +1,38 @@
 
 
-import Message from "./model/messageModel.js";
 
+import Message from "./model/messageModel.js";
 import { Op } from 'sequelize';
+import jwt from 'jsonwebtoken';
+import User from "./model/userModel.js";
+
+// import User from "./model/userModel.js"; // update path if needed
 
 export const handleSocket = (io) => {
-  io.on('connection', async (socket) => {
-    console.log('User connected:', socket.id);
 
-    // Get last seen message ID from client
+  // ✅ Authenticate using JWT before connection is accepted
+  io.use(async (socket, next) => {
+    try {
+      const { token } = socket.handshake.auth;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findByPk(decoded.id);
+      if (!user) return next(new Error("Unauthorized"));
+
+      socket.user = user; // Attach user info
+      next();
+    } catch (err) {
+      console.error("Socket auth error:", err.message);
+      next(new Error("Invalid token"));
+    }
+  });
+
+  // ✅ On connection
+  io.on('connection', async (socket) => {
+    console.log('User connected:', socket.user.username);
+
     const offset = socket.handshake.auth.serverOffset || 0;
 
-    // If built-in recovery failed, recover manually from DB
+    // ✅ Recovery from missed messages
     if (!socket.recovered) {
       try {
         const missedMessages = await Message.findAll({
@@ -20,72 +41,81 @@ export const handleSocket = (io) => {
         });
 
         missedMessages.forEach((msg) => {
-          socket.emit('chatMessage', { username: 'Recovered', text: msg.content }, msg.id);
+          socket.emit('chatMessage', {
+            username: msg.username,
+            text: msg.content,
+            clientOffset: msg.clientOffset,
+            recovered: true // ✅ flag for client UI
+          }, msg.id);
         });
 
-        console.log(`Recovered ${missedMessages.length} messages for client`);
+        console.log(`Recovered ${missedMessages.length} messages for ${socket.user.username}`);
       } catch (err) {
         console.error('Recovery error:', err.message);
       }
     }
 
-    // Live incoming message handler
-    // socket.on('chatMessage', async (msg) => {
-    //   try {
-    //     const savedMessage = await Message.create({
-    //       content: msg.text,
-    //       userId: null, // link to user if needed
-    //     });
-
-    //     // Broadcast to others
-    //     socket.broadcast.emit('chatMessage', msg, savedMessage.id);
-
-    //     // Re-send to sender if recovery wasn’t already used
-    //     if (!socket.recovered) {
-    //       socket.emit('chatMessage', msg, savedMessage.id);
-    //     }
-
-    //   } catch (err) {
-    //     console.error('Error saving message:', err.message);
-    //   }
-    // });
-
+    // ✅ Handle incoming messages
     socket.on("chatMessage", async (msg, clientOffset, callback) => {
       try {
         const [newMessage, created] = await Message.findOrCreate({
           where: { clientOffset },
           defaults: {
             content: msg.text,
-            clientOffset
+            clientOffset,
+            username: socket.user.username,  // ✅ use authenticated user
+            userId: socket.user.id           // ✅ optional: for ownership/deletion control
           }
         });
 
+        const fullMsg = {
+          username: socket.user.username,
+          text: msg.text,
+          clientOffset
+        };
+
         if (created) {
-          io.emit("chatMessage", msg, newMessage.id);
+          io.emit("chatMessage", fullMsg, newMessage.id);
         }
 
-        callback(); //  Must call this or client keeps retrying
+        callback(null, newMessage.id); // ✅ acknowledge with message ID
       } catch (err) {
-        console.error("Failed to save message:", err);
-        // still call callback to prevent endless retry
-        callback();
+        console.error("Failed to save message:", err.message);
+        callback(err); // still call to prevent infinite retries
       }
     });
-    
 
+    // ✅ Handle message deletion
     socket.on('deleteMessage', async (messageId) => {
-    try {
-        await Message.destroy({ where: { id: messageId } });
-        io.emit('messageDeleted', messageId); // tell all clients
-    } catch (err) {
+      try {
+        // Optional: Only allow delete if socket.user.id === message.userId
+        const msg = await Message.findByPk(messageId);
+        if (!msg) return;
+
+        // Optional check (enable if you store userId on messages)
+        // if (msg.userId !== socket.user.id) return;
+
+        await msg.destroy();
+        io.emit('messageDeleted', messageId);
+      } catch (err) {
         console.error('Delete error:', err.message);
-    }
+      }
     });
-
-
-
   });
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

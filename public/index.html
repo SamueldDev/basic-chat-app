@@ -120,15 +120,17 @@
     }
 
     #messages > li.self {
-      background: #007bff;
+      /* background: #007bff; */
+      background: #780000;
       color: white;
       align-self: flex-end;
       margin-left: auto;
     }
 
     #messages > li.other {
-      background: #e4e6eb;
-      color: #000;
+      /* background: #e4e6eb; */
+     background: #4cc9f0;
+      color: #010d16;
       align-self: flex-start;
       margin-right: auto;
     }
@@ -251,14 +253,30 @@
 
 
 <!-- using mysql db -->
+<!--  
  <script>
+
+   let username = localStorage.getItem('username');
+  if (!username) {
+    username = prompt("Enter your username:");
+    if (username) {
+      localStorage.setItem('username', username);
+    } else {
+      alert("Username is required to chat!");
+      location.reload(); // force retry
+    }
+  }
+
+
+
    let counter = 0;
   const socket = io({
     auth: {
+      username,
       serverOffset: 0
     },
-    ackTimeout: 10000,
-    retries: 3
+    ackTimeout: 10000, // wait max 10s for response
+    retries: 3        // try up to 3 times if no ack
   });
 
   const form = document.getElementById('form');
@@ -267,13 +285,8 @@
   const toggleBtn = document.getElementById('toggle-btn');
 
   let connected = true;
-  let username = '';
 
-  // Prompt for username
-  while (!username) {
-    username = prompt("Enter your name:");
-    if (!username) alert("Name is required to chat!");
-  }
+
 
 
    //  Fetch previous messages from the API
@@ -296,23 +309,142 @@
   console.log("Fetching messages..."); // 
   }
 
-
-  // Submit message
-  // form.addEventListener('submit', (e) => {
-  //   e.preventDefault();
-  //   if (input.value) {
-  //     const msg = {
-  //       username,
-  //       text: input.value
-  //     };
-  //     socket.emit('chatMessage', msg);
-  //     appendMessage(msg, 'self');
-  //     input.value = '';
-  //   }
-  // });
-
+const displayedMessages = new Set();
 
 form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (input.value) {
+    const msg = {
+      username,
+      text: input.value
+    };
+    const clientOffset = `${socket.id}-${counter++}`;
+    displayedMessages.add(clientOffset); // Mark as shown
+    socket.emit('chatMessage', msg, clientOffset, (ackErr) => {
+      if (ackErr) {
+        console.error("Server did not ack the message:", ackErr);
+      } else {
+        console.log("Message acknowledged by server");
+      }
+    });
+
+  
+    input.value = '';
+  }
+});
+
+socket.on('chatMessage', (msg, serverOffset) => {
+  if (displayedMessages.has(serverOffset)) return; // Already shown
+  appendMessage(msg, msg.username === username ? 'self' : 'other', serverOffset);
+  socket.auth.serverOffset = serverOffset;
+});
+
+  socket.on('messageDeleted', (messageId) => {
+  const li = document.querySelector(`#messages li[data-id="${messageId}"]`);
+  if (li) li.remove();
+});
+
+
+  // Connect/disconnect toggle
+  toggleBtn.addEventListener('click', () => {
+    if (connected) {
+      socket.disconnect();
+      toggleBtn.textContent = 'Connect';
+    } else {
+      socket.connect();
+      toggleBtn.textContent = 'Disconnect';
+    }
+    connected = !connected;
+  });
+
+
+
+
+  function appendMessage(msg, type, messageId) {
+  const item = document.createElement('li');
+  item.classList.add(type);
+
+  if (messageId) item.dataset.id = messageId;
+
+
+
+  const strong = document.createElement('strong');
+  strong.textContent = `${msg.username}: `;
+
+  const span = document.createElement('span');
+  span.textContent = msg.text;
+
+  item.appendChild(strong);
+  item.appendChild(span);
+
+  if (type === 'self' && messageId) {
+    const btn = document.createElement('button');
+    btn.textContent = '🗑️';
+    btn.style.marginLeft = '10px';
+    btn.addEventListener('click', () => {
+      socket.emit('deleteMessage', messageId);
+    });
+    item.appendChild(btn);
+  }
+
+  messages.appendChild(item);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+
+
+</script> -->
+
+
+
+<script>
+  let username = localStorage.getItem('username');
+  if (!username) {
+    username = prompt("Enter your username:");
+    if (username) {
+      localStorage.setItem('username', username);
+    } else {
+      alert("Username is required to chat!");
+      location.reload(); // force retry
+    }
+  }
+
+  let counter = 0;
+  const socket = io({
+    auth: {
+      username,
+      serverOffset: 0
+    },
+    ackTimeout: 10000,
+    retries: 3
+  });
+
+  const form = document.getElementById('form');
+  const input = document.getElementById('input');
+  const messages = document.getElementById('messages');
+  const toggleBtn = document.getElementById('toggle-btn');
+
+  let connected = true;
+  const displayedMessages = new Set();
+
+  // Load previous messages from API
+  async function loadMessages() {
+    try {
+      const res = await fetch('/api/messages');
+      const data = await res.json();
+      messages.innerHTML = '';
+      data.forEach((msg) => {
+        appendMessage({ username: 'Recovered', text: msg.content }, 'other', msg.id);
+        socket.auth.serverOffset = msg.id;
+      });
+    } catch (err) {
+      console.error('Failed to load messages:', err);
+      alert('⚠️ Could not fetch messages. See console.');
+    }
+  }
+
+  // Submit message
+  form.addEventListener('submit', (e) => {
     e.preventDefault();
     if (input.value) {
       const msg = {
@@ -320,23 +452,32 @@ form.addEventListener('submit', (e) => {
         text: input.value
       };
       const clientOffset = `${socket.id}-${counter++}`;
-      socket.emit('chatMessage', msg, clientOffset, () => {
-        console.log("Message acked");
+      displayedMessages.add(clientOffset);
+
+      socket.emit('chatMessage', msg, clientOffset, (ackErr) => {
+        if (ackErr) {
+          console.error("Server did not acknowledge the message:", ackErr);
+        } else {
+          console.log("Message acknowledged by server");
+        }
       });
-      appendMessage(msg, 'self');
+
       input.value = '';
     }
   });
 
-
-
-  // Receive message from others (broadcasted)
+  // Receive message from server
   socket.on('chatMessage', (msg, serverOffset) => {
-    // Avoid showing your own message twice
-    if (msg.username !== username) {
-      appendMessage(msg, 'other');
-    }
-    socket.auth.serverOffset = serverOffset; // track message ID
+    if (displayedMessages.has(serverOffset)) return;
+    const type = msg.username === username ? 'self' : 'other';
+    appendMessage(msg, type, serverOffset);
+    socket.auth.serverOffset = serverOffset;
+  });
+
+  // Handle message deletion
+  socket.on('messageDeleted', (messageId) => {
+    const li = document.querySelector(`#messages li[data-id="${messageId}"]`);
+    if (li) li.remove();
   });
 
   // Connect/disconnect toggle
@@ -351,17 +492,79 @@ form.addEventListener('submit', (e) => {
     connected = !connected;
   });
 
-  // DOM rendering
-  function appendMessage(msg, type) {
+  // Append message to DOM
+  function appendMessage(msg, type, messageId) {
+    if (!messageId) return;
+
     const item = document.createElement('li');
     item.classList.add(type);
-    item.innerHTML = `<strong>${msg.username}:</strong> ${msg.text}`;
+    item.dataset.id = messageId;
+
+    const strong = document.createElement('strong');
+    strong.textContent = `${msg.username}: `;
+
+    const span = document.createElement('span');
+    span.textContent = msg.text;
+
+    item.appendChild(strong);
+    item.appendChild(span);
+
+    if (type === 'self') {
+      const btn = document.createElement('button');
+      btn.textContent = '🗑️';
+      btn.style.marginLeft = '10px';
+      btn.addEventListener('click', () => {
+        socket.emit('deleteMessage', messageId);
+      });
+      item.appendChild(btn);
+    }
+
     messages.appendChild(item);
     messages.scrollTop = messages.scrollHeight;
   }
+
+  // Load messages on page load
+  loadMessages();
 </script>
 
 
 
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <!-- // Receive message from others (broadcasted)
+  // socket.on('chatMessage', (msg, serverOffset) => {
+  //   // Avoid showing your own message twice
+  //   if (msg.username !== username) {
+  //     appendMessage(msg, 'other');
+  //   }
+  //   socket.auth.serverOffset = serverOffset; // track message ID
+  // });
+ -->
+
+
+
+
+  <!-- // DOM rendering
+  // function appendMessage(msg, type) {
+  //   const item = document.createElement('li');
+  //   item.classList.add(type);
+  //   item.innerHTML = `<strong>${msg.username}:</strong> ${msg.text}`;
+  //   messages.appendChild(item);
+  //   messages.scrollTop = messages.scrollHeight;
+  // } -->

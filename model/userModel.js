@@ -9,6 +9,10 @@ const User = sequelize.define('User', {
     unique: true,
     allowNull: false,
   },
+    password: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
   status: {
     type: DataTypes.STRING,
     defaultValue: 'offline',
