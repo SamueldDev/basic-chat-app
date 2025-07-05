@@ -1,10 +1,331 @@
 
-
-
 <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Chat App</title>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-4">
+
+  <div class="w-full max-w-2xl bg-white rounded-xl shadow-md p-6 space-y-4">
+    <h2 class="text-2xl font-bold text-center text-gray-700">Chat Room</h2>
+
+    <ul id="messages" class="flex flex-col gap-2 max-h-96 overflow-y-auto px-2">
+      <!-- Messages inserted here -->
+    </ul>
+
+    <form id="form" class="flex gap-2">
+      <input id="input" autocomplete="off" placeholder="Type your message..."
+        class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      <button type="submit"
+        class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Send</button>
+    </form>
+
+    <div class="flex justify-between gap-2">
+      <button id="toggle-btn"
+        class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition">Disconnect</button>
+      <button onclick="logout()"
+        class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition">Logout</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    const username = localStorage.getItem('username');
+
+    if (!token || !username) {
+      alert('You must be logged in!');
+      location.href = 'login.html';
+    }
+
+    let counter = 0;
+    const displayedMessages = new Set();
+    let myUserId = null;
+
+    const socket = io({
+      auth: { token, serverOffset: 0 },
+      ackTimeout: 10000,
+      retries: 3
+    });
+
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
+    const toggleBtn = document.getElementById('toggle-btn');
+    let connected = true;
+
+    socket.on('me', (id) => {
+      myUserId = id;
+      loadMessages();
+    });
+
+    async function loadMessages() {
+      try {
+        const res = await fetch('/api/messages', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        data.forEach(msg => {
+          const id = String(msg.id);
+          const type = msg.userId === myUserId ? 'self' : 'other';
+          appendMessage(msg, type, id, true);
+          displayedMessages.add(id);
+        });
+      } catch (err) {
+        console.error('Message fetch failed:', err);
+      }
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      const clientOffset = `${socket.id}-${counter++}`;
+      displayedMessages.add(clientOffset);
+
+      socket.emit('chatMessage', { text }, clientOffset, (err, serverId) => {
+        if (!err) upgradeMessageId(clientOffset, serverId);
+      });
+
+      input.value = '';
+    });
+
+
+    socket.on('chatMessage', (msg, serverId) => {
+      const id = String(serverId);
+      const type = msg.userId == myUserId ? 'self' : 'other';
+
+      // If this message was already appended (by server or client), skip
+      if (document.querySelector(`#messages li[data-id="${id}"]`)) return;
+
+      // Upgrade messageId if it came from my clientOffset
+      if (msg.clientOffset && displayedMessages.has(msg.clientOffset)) {
+        upgradeMessageId(msg.clientOffset, id);
+        // DO NOT RETURN — still append the message
+      }
+
+      appendMessage(msg, type, id, msg.recovered);
+
+      if (msg.clientOffset) displayedMessages.add(msg.clientOffset);
+      displayedMessages.add(id);
+    });
+
+    toggleBtn.addEventListener('click', () => {
+      connected ? socket.disconnect() : socket.connect();
+      toggleBtn.textContent = connected ? 'Connect' : 'Disconnect';
+      connected = !connected;
+    });
+
+    function appendMessage(msg, type, messageId, recovered = false) {
+      // Prevent adding duplicate message element
+      if (document.querySelector(`#messages li[data-id="${messageId}"]`)) return;
+
+      const li = document.createElement('li');
+      li.dataset.id = messageId;
+
+      let baseClasses =
+        "px-3 py-2 rounded-md text-sm max-w-[75%] whitespace-pre-wrap break-words";
+      if (type === "self") {
+        li.className = `${baseClasses} bg-green-100 self-end text-right ml-auto`;
+      } else if (type === "other") {
+        li.className = `${baseClasses} bg-gray-200 self-start text-left mr-auto`;
+      }
+      if (recovered) li.classList.add("italic", "opacity-70");
+
+      const strong = document.createElement('strong');
+      if (type === "other") {
+        strong.textContent = `${msg.username || '(anon)'}: `;
+      }
+
+      const span = document.createElement('span');
+      span.textContent = msg.text;
+
+      li.appendChild(strong);
+      li.appendChild(span);
+      messages.appendChild(li);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function upgradeMessageId(tempId, realId) {
+      const li = document.querySelector(`#messages li[data-id="${tempId}"]`);
+      if (li) li.dataset.id = realId;
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      location.href = 'login.html';
+    }
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- <!DOCTYPE html>
 <html>
 <head>
+   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
   <title>Chat App</title>
+
   <style>
     body { font-family: sans-serif; }
     #messages { list-style-type: none; padding: 0; max-height: 400px; overflow-y: auto; }
@@ -12,7 +333,9 @@
     #messages li.other { text-align: left; background: #f0f0f0; margin: 4px 0; padding: 4px; }
     #messages li.recovered { opacity: 0.7; font-style: italic; }
   </style>
+
 </head>
+
 <body>
 
 <h2>Chat Room</h2>
@@ -81,29 +404,6 @@
     }
   }
 
-  // form.addEventListener('submit', (e) => {
-  //   e.preventDefault();
-  //   const text = input.value.trim();
-  //   if (!text) return;
-
-  //   const clientOffset = `${socket.id}-${counter++}`;
-  //   const tempId = clientOffset;
-  //   const msgObj = { text, username, userId: myUserId };
-
-  //   appendMessage(msgObj, 'self', tempId); // Optimistic display
-  //   displayedMessages.add(tempId);
-
-  //   socket.emit('chatMessage', { text }, clientOffset, (err, serverId) => {
-  //     if (!err) {
-  //       upgradeMessageId(tempId, serverId);
-  //       displayedMessages.add(String(serverId));
-  //     }
-  //   });
-
-  //   input.value = '';
-  // });
-
-
 
 form.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -121,12 +421,6 @@ form.addEventListener('submit', (e) => {
 
   input.value = '';
 });
-
-
-
-
-
-
 
 
   socket.on('chatMessage', (msg, serverId) => {
@@ -162,8 +456,6 @@ form.addEventListener('submit', (e) => {
     if (recovered) item.classList.add('recovered');
     if (messageId) item.dataset.id = messageId;
 
-    // const strong = document.createElement('strong');
-    // strong.textContent = `${msg.username || '(anon)'}: `;
 
     const strong = document.createElement('strong');
     if (type === 'other') {
@@ -195,3 +487,4 @@ form.addEventListener('submit', (e) => {
 </script>
 </body>
 </html>
+ -->

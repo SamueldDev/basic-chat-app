@@ -1,6 +1,4 @@
 
-// mysql db and sequelize for chat-app
-
 import { createServer } from "http"
 import { Server } from "socket.io"
 import path from 'path';
@@ -69,9 +67,8 @@ const start = async () => {
       await sequelize.sync({ alter: true})
       console.log("database synced ")
 
-      //   await sequelize.sync({ force: true})
+      // await sequelize.sync({ force: true})
       // console.log("all tables dropped and recreated ")
-
 
       server.listen(PORT, () => {  
 

@@ -1,7 +1,5 @@
 
-
 import sequelize from "../config/db.js";
-import User from "./userModel.js";
 import { DataTypes } from "sequelize";
 
 const Message = sequelize.define('Message', {
@@ -13,7 +11,7 @@ const Message = sequelize.define('Message', {
   clientOffset: {
     type: DataTypes.STRING,
     unique: true,
-    allowNull: true // optional if fallback is used
+    allowNull: true 
   },
 
   timestamp: {

@@ -6,25 +6,6 @@ import Message from "../model/messageModel.js";
 
 // create a message- optional
 
-// export const createMessage = async (req, res) => {
-//   const { username, content } = req.body;
-
-//   try {
-//     const user = await User.findOne({ where: { username } });
-//     if (!user) return res.status(404).json({ error: 'User not found' });
-
-//     const message = await Message.create({
-//       content,
-//       userId: user.id,
-//     });
-
-//     res.status(201).json(message);
-//   } catch (err) {
-//     res.status(400).json({ error: err.message });
-//   }
-// };
-
-
 export const createMessage = async (req, res) => {
   const { content } = req.body;
   const userId = req.user.id;
@@ -35,7 +16,7 @@ export const createMessage = async (req, res) => {
 
     const message = await Message.create({
       content,
-      username: user.username, // 💡 save redundant username
+      username: user.username, 
       userId: user.id,
     });
 
@@ -51,7 +32,7 @@ export const createMessage = async (req, res) => {
 };
 
 
-
+// get all message
 export const getMessages = async (req, res) => {
   try {
     const messages = await Message.findAll({
@@ -74,9 +55,7 @@ export const getMessages = async (req, res) => {
 
 
 
-
-
-// delete mesahe by id
+// delete message by id
 export const deleteMessageById = async (req, res) => {
   try {
     const message = await Message.findByPk(req.params.id);

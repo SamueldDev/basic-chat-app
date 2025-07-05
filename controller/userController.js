@@ -1,9 +1,6 @@
 
 
 import User from "../model/userModel.js";
-
-// routes/auth.js
-
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
@@ -31,10 +28,7 @@ export const register = async (req, res) => {
 
 
 
-
-
 // log a user in
-
 export const login = async (req, res) => {
   const { username, password } = req.body;
 
