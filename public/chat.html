@@ -1,14 +1,16 @@
 
 
+
 <!DOCTYPE html>
 <html>
 <head>
   <title>Chat App</title>
   <style>
     body { font-family: sans-serif; }
-    #messages { list-style-type: none; padding: 0; max-height: 400px; overflow-y: scroll; }
+    #messages { list-style-type: none; padding: 0; max-height: 400px; overflow-y: auto; }
     #messages li.self { text-align: right; background: #e0ffe0; margin: 4px 0; padding: 4px; }
     #messages li.other { text-align: left; background: #f0f0f0; margin: 4px 0; padding: 4px; }
+    #messages li.recovered { opacity: 0.7; font-style: italic; }
   </style>
 </head>
 <body>
@@ -26,7 +28,6 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-  // ✅ Check for authentication
   const token = localStorage.getItem('token');
   const username = localStorage.getItem('username');
 
@@ -37,6 +38,7 @@
 
   let counter = 0;
   const displayedMessages = new Set();
+  let myUserId = null;
 
   const socket = io({
     auth: {
@@ -51,104 +53,138 @@
   const input = document.getElementById('input');
   const messages = document.getElementById('messages');
   const toggleBtn = document.getElementById('toggle-btn');
-
   let connected = true;
 
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (input.value.trim()) {
-      const text = input.value.trim();
-      const clientOffset = `${socket.id}-${counter++}`;
-      const msg = { username, text, clientOffset };
-
-      // Optimistic UI
-      appendMessage(msg, 'self', clientOffset);
-      displayedMessages.add(clientOffset);
-
-      socket.emit('chatMessage', msg, clientOffset, (err, serverId) => {
-        if (err) {
-          console.error("Message failed:", err);
-        } else {
-          upgradeMessageId(clientOffset, serverId);
-        }
-      });
-
-      input.value = '';
-    }
+  socket.on('me', (id) => {
+    myUserId = id;
+    loadMessages();
   });
 
+  async function loadMessages() {
+    try {
+      const res = await fetch('/api/messages', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      data.forEach(msg => {
+        const id = String(msg.id);
+        if (displayedMessages.has(id)) return;
+
+        const type = msg.userId === myUserId ? 'self' : 'other';
+        appendMessage(msg, type, id, true);
+        displayedMessages.add(id);
+      });
+    } catch (err) {
+      console.error('Message fetch failed:', err);
+    }
+  }
+
+  // form.addEventListener('submit', (e) => {
+  //   e.preventDefault();
+  //   const text = input.value.trim();
+  //   if (!text) return;
+
+  //   const clientOffset = `${socket.id}-${counter++}`;
+  //   const tempId = clientOffset;
+  //   const msgObj = { text, username, userId: myUserId };
+
+  //   appendMessage(msgObj, 'self', tempId); // Optimistic display
+  //   displayedMessages.add(tempId);
+
+  //   socket.emit('chatMessage', { text }, clientOffset, (err, serverId) => {
+  //     if (!err) {
+  //       upgradeMessageId(tempId, serverId);
+  //       displayedMessages.add(String(serverId));
+  //     }
+  //   });
+
+  //   input.value = '';
+  // });
+
+
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+
+  const clientOffset = `${socket.id}-${counter++}`;
+  displayedMessages.add(clientOffset); // track to prevent double-rendering
+
+  // 🚫 Don't manually append anything here
+
+  socket.emit('chatMessage', { text }, clientOffset, (err, serverId) => {
+    if (!err) upgradeMessageId(clientOffset, serverId);
+  });
+
+  input.value = '';
+});
+
+
+
+
+
+
+
+
   socket.on('chatMessage', (msg, serverId) => {
-    // If already shown via optimistic UI, upgrade
+    const id = String(serverId);
+    console.log('📥 Received message from server:', msg);
+
+
     if (msg.clientOffset && displayedMessages.has(msg.clientOffset)) {
-      upgradeMessageId(msg.clientOffset, serverId);
+      upgradeMessageId(msg.clientOffset, id);
       return;
     }
 
-    // Otherwise show as new message
-    const type = msg.username === username ? 'self' : 'other';
-    appendMessage(msg, type, serverId);
-  });
+    if (displayedMessages.has(id)) return;
 
-  socket.on('messageDeleted', (messageId) => {
-    const li = document.querySelector(`#messages li[data-id="${messageId}"]`);
-    if (li) li.remove();
+    const type = msg.userId === myUserId ? 'self' : 'other';
+    appendMessage(msg, type, id, msg.recovered);
+
+    if (msg.clientOffset) displayedMessages.add(msg.clientOffset);
+    displayedMessages.add(id);
   });
 
   toggleBtn.addEventListener('click', () => {
-    if (connected) {
-      socket.disconnect();
-      toggleBtn.textContent = 'Connect';
-    } else {
-      socket.connect();
-      toggleBtn.textContent = 'Disconnect';
-    }
+    connected ? socket.disconnect() : socket.connect();
+    toggleBtn.textContent = connected ? 'Connect' : 'Disconnect';
     connected = !connected;
   });
 
-  function appendMessage(msg, type, messageId) {
+  function appendMessage(msg, type, messageId, recovered = false) {
+    if (displayedMessages.has(messageId)) return;
+
     const item = document.createElement('li');
     item.classList.add(type);
+    if (recovered) item.classList.add('recovered');
     if (messageId) item.dataset.id = messageId;
 
+    // const strong = document.createElement('strong');
+    // strong.textContent = `${msg.username || '(anon)'}: `;
+
     const strong = document.createElement('strong');
-    strong.textContent = `${msg.username}: `;
+    if (type === 'other') {
+      strong.textContent = `${msg.username || '(anon)'}: `;
+    } else {
+      strong.textContent = ''; // Don't repeat your name for your own messages
+    }
+
 
     const span = document.createElement('span');
     span.textContent = msg.text;
 
     item.appendChild(strong);
     item.appendChild(span);
-
-    if (type === 'self' && messageId) {
-      const btn = document.createElement('button');
-      btn.textContent = '🗑️';
-      btn.style.marginLeft = '10px';
-      btn.addEventListener('click', () => {
-        socket.emit('deleteMessage', messageId);
-      });
-      item.appendChild(btn);
-    }
-
     messages.appendChild(item);
     messages.scrollTop = messages.scrollHeight;
   }
 
   function upgradeMessageId(tempId, realId) {
     const li = document.querySelector(`#messages li[data-id="${tempId}"]`);
-    if (!li) return;
-
-    li.dataset.id = realId;
-
-    // Add delete button if not present
-    if (!li.querySelector('button')) {
-      const btn = document.createElement('button');
-      btn.textContent = '🗑️';
-      btn.style.marginLeft = '10px';
-      btn.addEventListener('click', () => {
-        socket.emit('deleteMessage', realId);
-      });
-      li.appendChild(btn);
-    }
+    if (li) li.dataset.id = realId;
   }
 
   function logout() {
@@ -157,6 +193,5 @@
     location.href = 'login.html';
   }
 </script>
-
 </body>
 </html>

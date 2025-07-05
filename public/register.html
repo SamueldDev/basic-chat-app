@@ -1,6 +1,6 @@
 
 
-<!-- register.html -->
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -31,7 +31,11 @@
 
       if (res.ok) {
         localStorage.setItem('token', data.token);
-        localStorage.setItem('username', data.user.username);
+
+        localStorage.setItem('username', data.username); // because your backend returns { username, token }
+
+        // localStorage.setItem('username', data.user.username);
+
         location.href = 'chat.html'; // redirect to chat
       } else {
         alert(data.error || 'Registration failed');

@@ -5,13 +5,17 @@ import { createServer } from "http"
 import { Server } from "socket.io"
 import path from 'path';
 import { fileURLToPath } from 'url';
-import sequelize from "./config/db.js"
+
+import { sequelize } from "./model/index.js"
+
+//import sequelize from "./config/db.js"
+
 import dotenv from "dotenv"
 dotenv.config()
 import userRoute  from "./routes/userRoute.js"
 import messageRoute from './routes/messageRoute.js';
 import { handleSocket } from "./socket.js";
-import express from "express"  
+import express from "express"      
 
 const PORT = process.env.PORT || 5000;
 
@@ -20,7 +24,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 
-const app = express()
+const app = express()  
 
 // parse the josn bodies
 app.use(express.json())    
@@ -34,19 +38,19 @@ app.get('/', (req, res) => {
 });
 
 
-app.get("/chat", (req, res) => {
-  res.send("chat_blog API is Live")
+app.get("/chat", (req, res) => {  
+  res.send("chat_blog API is Live")   
 })
 
-app.use("/api/user", userRoute)
+app.use("/api/user", userRoute)  
 
 app.use('/api/messages', messageRoute);
-
-const server = createServer(app)
+  
+const server = createServer(app)  
 const io = new Server(server,
     {
          connectionStateRecovery: {}
-    }
+    }  
 )
 
 handleSocket(io)
@@ -56,23 +60,28 @@ const start = async () => {
       await sequelize.authenticate()
       console.log('DB connected')
 
-      // // production-safe
+      // // production-safe  
       // await sequelize.sync();
-      // console.log("database synced") 
+      // console.log("database synced")   
 
       // dev only 
+
       await sequelize.sync({ alter: true})
       console.log("database synced ")
 
-      server.listen(PORT, () => {
+      //   await sequelize.sync({ force: true})
+      // console.log("all tables dropped and recreated ")
+
+
+      server.listen(PORT, () => {  
 
         console.log(`server running on port ${PORT}`)
         console.log(" Accessible on local network at http://192.168.43.51:3000");
       })
-    }catch(err){  
+    }catch(err){    
         console.error("Unable to connect to database:", err)
     }
-}
+}  
 
 start()
 
@@ -83,13 +92,32 @@ start()
 
 
 
-// node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-
-
 // nodemon app.js
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 
 
 
