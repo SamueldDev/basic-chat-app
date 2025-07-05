@@ -18,7 +18,6 @@ Graceful handling of disconnection and reconnection
 
 Clean UI using HTML, CSS, and client-side JavaScript
 
-
 🧠 Architecture Overview
 Frontend
 
@@ -86,7 +85,7 @@ chat-app/
 
 Clone the repo
 
-git clone https://github.com/yourusername/chat-app.git
+git clone https://github.com/SamueldDev/basic-chat-app
 
 cd basic-chat-app
 
