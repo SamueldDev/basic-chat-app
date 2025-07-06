@@ -13,6 +13,7 @@ dotenv.config()
 import userRoute  from "./routes/userRoute.js"
 import messageRoute from './routes/messageRoute.js';
 import { handleSocket } from "./socket.js";
+import { setupSwagger } from "./config/swagger.js";
 import express from "express"      
 
 const PORT = process.env.PORT || 5000;
@@ -24,6 +25,8 @@ const __dirname = path.dirname(__filename);
 
 const app = express()  
 
+setupSwagger(app) 
+
 // parse the josn bodies
 app.use(express.json())    
 
@@ -31,9 +34,9 @@ app.use(express.json())
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Optional: route for '/'
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// app.get('/', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// });
 
 
 app.get("/chat", (req, res) => {  
@@ -67,13 +70,10 @@ const start = async () => {
       await sequelize.sync({ alter: true})
       console.log("database synced ")
 
-      // await sequelize.sync({ force: true})
-      // console.log("all tables dropped and recreated ")
-
       server.listen(PORT, () => {  
 
         console.log(`server running on port ${PORT}`)
-        console.log(" Accessible on local network at http://192.168.43.51:3000");
+        console.log(" Accessible on local network at http://192.168.43.51:7000");
       })
     }catch(err){    
         console.error("Unable to connect to database:", err)
@@ -89,6 +89,20 @@ start()
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+// http://localhost:7000/api-docs
+
+
 // nodemon app.js
 
 
@@ -97,12 +111,8 @@ start()
 
 
 
-
-
-
-
-
-
+// await sequelize.sync({ force: true})
+// console.log("all tables dropped and recreated ")
 
 
 
